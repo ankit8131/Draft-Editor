@@ -31,19 +31,19 @@ export default function MyPublicationsPage() {
           <div className="w-px h-4 bg-zinc-200" />
           <div className="flex items-center gap-2">
             <div className="w-3.5 h-3.5 bg-zinc-900 rounded-sm" />
-            <span className="font-semibold text-sm tracking-tight text-zinc-900">Ankit Studio</span>
+            <span className="font-semibold text-sm tracking-tight text-zinc-900">Pocket FM Studio</span>
           </div>
           <span className="text-zinc-300">/</span>
           <span className="text-sm text-zinc-500">My Publications</span>
         </div>
       </nav>
 
-      <main className="flex-1 px-8 sm:px-12 py-12 max-w-3xl mx-auto w-full">
+      <main id="main-content" className="flex-1 px-8 sm:px-12 py-12 max-w-3xl mx-auto w-full">
         <h1 className="text-2xl font-bold text-zinc-900 mb-8">My Publications</h1>
 
         {loading ? (
-          <div className="flex items-center gap-3 text-zinc-400">
-            <span className="w-4 h-4 rounded-full border-2 border-zinc-200 border-t-zinc-500 animate-spin" />
+          <div role="status" className="flex items-center gap-3 text-zinc-400">
+            <span aria-hidden="true" className="w-4 h-4 rounded-full border-2 border-zinc-200 border-t-zinc-500 motion-safe:animate-spin" />
             <span className="text-sm">Loading…</span>
           </div>
         ) : publications.length === 0 ? (
@@ -74,7 +74,7 @@ export default function MyPublicationsPage() {
                     })}
                   </p>
                 </div>
-                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="text-zinc-300 group-hover:text-zinc-500 transition-colors shrink-0">
+                <svg aria-hidden="true" width="14" height="14" viewBox="0 0 14 14" fill="none" className="text-zinc-300 group-hover:text-zinc-500 transition-colors shrink-0">
                   <path d="M5 1l6 6-6 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               </Link>

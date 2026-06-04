@@ -23,9 +23,17 @@ export type ChapterRecord = {
 }
 
 // Persist to a file next to the project root so data survives server restarts
-const DB_PATH = path.join(process.cwd(), '.data', 'studio.db')
+const DB_PATH = process.env.STUDIO_DB_PATH ?? path.join(process.cwd(), '.data', 'studio.db')
 
 const globalStore = global as typeof global & { __db?: Database.Database }
+
+// Only for use in tests — closes and clears the singleton so a fresh DB can be opened
+export function _resetDbForTesting() {
+  if (globalStore.__db) {
+    globalStore.__db.close()
+    globalStore.__db = undefined
+  }
+}
 
 function getDb(): Database.Database {
   if (!globalStore.__db) {

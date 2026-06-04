@@ -234,9 +234,9 @@ export default function EditorPage({ params }: { params: Promise<{ docId: string
 
   if (!activeChapterId) {
     return (
-      <div className="flex h-screen items-center justify-center bg-white">
+      <div role="status" className="flex h-screen items-center justify-center bg-white">
         <div className="flex items-center gap-3">
-          <span className="w-4 h-4 rounded-full border-2 border-zinc-200 border-t-zinc-600 animate-spin" />
+          <span aria-hidden="true" className="w-4 h-4 rounded-full border-2 border-zinc-200 border-t-zinc-600 motion-safe:animate-spin" />
           <span className="text-sm text-zinc-400">Loading…</span>
         </div>
       </div>
@@ -269,7 +269,7 @@ export default function EditorPage({ params }: { params: Promise<{ docId: string
             {editingTitle ? (
                 <input
                   autoFocus
-                  className="text-sm text-zinc-700 font-medium bg-transparent border-b border-zinc-400 outline-none truncate min-w-0 max-w-[200px]"
+                  className="text-sm text-zinc-700 font-medium bg-transparent outline-none truncate min-w-0 max-w-[200px]"
                   value={titleDraft}
                   onChange={(e) => setTitleDraft(e.target.value)}
                   onBlur={() => {
@@ -286,10 +286,20 @@ export default function EditorPage({ params }: { params: Promise<{ docId: string
                 />
               ) : (
                 <span
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`Edit title: ${serverDoc?.title ?? 'Untitled Script'}`}
                   className="text-sm text-zinc-700 font-medium truncate cursor-pointer hover:text-zinc-900"
                   onClick={() => {
                     setTitleDraft(serverDoc?.title ?? 'Untitled Script')
                     setEditingTitle(true)
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      setTitleDraft(serverDoc?.title ?? 'Untitled Script')
+                      setEditingTitle(true)
+                    }
                   }}
                 >
                   {serverDoc?.title ?? 'Untitled Script'}
@@ -330,10 +340,10 @@ export default function EditorPage({ params }: { params: Promise<{ docId: string
             publishFeedback={publishFeedback}
           />
 
-          <main className="flex-1 overflow-y-auto bg-white">
+          <main id="main-content" className="flex-1 overflow-y-auto bg-white">
             {!chapterReady ? (
-              <div className="flex items-center justify-center h-32">
-                <span className="w-4 h-4 rounded-full border-2 border-zinc-200 border-t-zinc-600 animate-spin" />
+              <div role="status" aria-label="Loading chapter" className="flex items-center justify-center h-32">
+                <span aria-hidden="true" className="w-4 h-4 rounded-full border-2 border-zinc-200 border-t-zinc-600 motion-safe:animate-spin" />
               </div>
             ) : (
               <Editor

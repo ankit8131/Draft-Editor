@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Ankit Studio",
+  title: "Pocket FM Studio",
   description: "Professional script writing platform for creators.",
 };
 

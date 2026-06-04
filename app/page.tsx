@@ -25,7 +25,7 @@ export default function Home() {
       {/* Nav */}
       <nav className="px-8 sm:px-12 h-16 flex items-center justify-between border-b border-zinc-100">
         <div className="flex items-center gap-2.5">
-          <div className="w-4 h-4 bg-zinc-900 rounded-sm" />
+          <div aria-hidden="true" className="w-4 h-4 bg-zinc-900 rounded-sm" />
           <span className="font-semibold text-sm tracking-tight text-zinc-900">Pocket FM Studio</span>
         </div>
         <div className="flex items-center gap-6">
@@ -42,7 +42,7 @@ export default function Home() {
       </nav>
 
       {/* Hero */}
-      <section className="flex-1 flex flex-col items-center justify-center text-center px-6 py-24 sm:py-32">
+      <main id="main-content" className="flex-1 flex flex-col items-center justify-center text-center px-6 py-24 sm:py-32">
         <div className="inline-flex items-center gap-2 mb-10 px-3 py-1.5 rounded-full bg-zinc-100">
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
           <span className="text-[11px] text-zinc-600 tracking-wide">
@@ -63,7 +63,7 @@ export default function Home() {
         <NewScriptButton />
 
         <p className="mt-5 text-xs text-zinc-400">No account needed. Starts instantly.</p>
-      </section>
+      </main>
 
       {/* Features */}
       <section className="border-t border-zinc-100">

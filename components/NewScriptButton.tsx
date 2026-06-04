@@ -21,13 +21,15 @@ export default function NewScriptButton() {
 
   return (
     <button
+      type="button"
       onClick={handleClick}
       disabled={loading}
+      aria-busy={loading}
       className="inline-flex items-center gap-2.5 bg-zinc-900 text-white px-8 py-3.5 text-sm font-medium hover:bg-zinc-700 active:bg-zinc-800 transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
     >
       {loading ? (
         <>
-          <span className="w-3.5 h-3.5 rounded-full border-2 border-zinc-600 border-t-white animate-spin" />
+          <span aria-hidden="true" className="w-3.5 h-3.5 rounded-full border-2 border-zinc-600 border-t-white motion-safe:animate-spin" />
           Creating…
         </>
       ) : (

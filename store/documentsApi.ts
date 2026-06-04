@@ -1,69 +1,109 @@
-import { createApi } from '@reduxjs/toolkit/query/react'
+import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react'
 
 export type DocumentRecord = {
   id: string
   title: string
-  content: string | null
   updatedAt: string
 }
 
-type MockArgs = {
-  url: string
-  method?: string
-  body?: Record<string, unknown>
+export type VersionRecord = {
+  id: string
+  docId: string
+  versionNumber: number
+  savedAt: string
 }
 
-// In-memory store for mock backend.
-// updatedAt starts at epoch (new Date(0)) so any locally-saved content
-// is always treated as newer. A real backend would return the actual saved timestamp.
-const mockStore: Record<string, DocumentRecord> = {
-  'doc-1': {
-    id: 'doc-1',
-    title: 'Untitled Document',
-    content: null,
-    updatedAt: new Date(0).toISOString(),
-  },
+export type ChapterMeta = {
+  id: string
+  versionId: string
+  order: number
+  title: string
 }
 
-const mockBaseQuery = async ({ url, method = 'GET', body }: MockArgs) => {
-  const match = url.match(/^\/documents\/(.+)$/)
-  if (!match) return { error: { status: 404, error: 'Not found' } }
-
-  const id = match[1]
-
-  if (method === 'GET') {
-    const doc = mockStore[id]
-    return doc ? { data: doc } : { error: { status: 404, error: 'Not found' } }
-  }
-
-  if (method === 'PATCH') {
-    if (!mockStore[id]) return { error: { status: 404, error: 'Not found' } }
-    mockStore[id] = {
-      ...mockStore[id],
-      ...(body as Partial<DocumentRecord>),
-      updatedAt: new Date().toISOString(),
-    }
-    return { data: mockStore[id] }
-  }
-
-  return { error: { status: 405, error: 'Method not allowed' } }
+export type ChapterRecord = ChapterMeta & {
+  content: string | null
 }
 
 export const documentsApi = createApi({
   reducerPath: 'documentsApi',
-  baseQuery: mockBaseQuery,
+  baseQuery: fetchBaseQuery({ baseUrl: '/api' }),
+  tagTypes: ['Versions', 'Chapters'],
   endpoints: (builder) => ({
     getDocument: builder.query<DocumentRecord, string>({
-      query: (id) => ({ url: `/documents/${id}` }),
+      query: (id) => `/documents/${id}`,
     }),
-    saveDocument: builder.mutation<DocumentRecord, { id: string; content: string }>({
-      query: ({ id, content }) => ({
+    getVersions: builder.query<VersionRecord[], string>({
+      query: (docId) => `/documents/${docId}/versions`,
+      providesTags: (_result, _error, docId) => [{ type: 'Versions', id: docId }],
+    }),
+    createVersion: builder.mutation<
+      VersionRecord,
+      { docId: string; versionNumber: number; sourceVersionId?: string }
+    >({
+      query: ({ docId, versionNumber, sourceVersionId }) => ({
+        url: `/documents/${docId}/versions`,
+        method: 'POST',
+        body: { versionNumber, sourceVersionId },
+      }),
+      invalidatesTags: (_result, _error, { docId }) => [{ type: 'Versions', id: docId }],
+    }),
+    getChapters: builder.query<ChapterMeta[], { docId: string; versionId: string }>({
+      query: ({ docId, versionId }) => `/documents/${docId}/versions/${versionId}/chapters`,
+      providesTags: (_result, _error, { versionId }) => [{ type: 'Chapters', id: versionId }],
+    }),
+    getChapter: builder.query<
+      ChapterRecord,
+      { docId: string; versionId: string; chapterId: string }
+    >({
+      query: ({ docId, versionId, chapterId }) =>
+        `/documents/${docId}/versions/${versionId}/chapters/${chapterId}`,
+    }),
+    createChapter: builder.mutation<
+      ChapterRecord,
+      { docId: string; versionId: string; order: number; title: string }
+    >({
+      query: ({ docId, versionId, order, title }) => ({
+        url: `/documents/${docId}/versions/${versionId}/chapters`,
+        method: 'POST',
+        body: { order, title },
+      }),
+      invalidatesTags: (_result, _error, { versionId }) => [{ type: 'Chapters', id: versionId }],
+    }),
+    updateChapter: builder.mutation<
+      ChapterRecord,
+      { docId: string; versionId: string; chapterId: string; content?: string; title?: string }
+    >({
+      query: ({ docId, versionId, chapterId, content, title }) => ({
+        url: `/documents/${docId}/versions/${versionId}/chapters/${chapterId}`,
+        method: 'PATCH',
+        body: { content, title },
+      }),
+    }),
+    updateDocument: builder.mutation<DocumentRecord, { id: string; title: string }>({
+      query: ({ id, title }) => ({
         url: `/documents/${id}`,
         method: 'PATCH',
-        body: { content },
+        body: { title },
       }),
+      async onQueryStarted({ id, title }, { dispatch, queryFulfilled }) {
+        dispatch(
+          documentsApi.util.updateQueryData('getDocument', id, (draft) => {
+            draft.title = title
+          }),
+        )
+        try { await queryFulfilled } catch { /* revert on error happens automatically */ }
+      },
     }),
   }),
 })
 
-export const { useGetDocumentQuery, useSaveDocumentMutation } = documentsApi
+export const {
+  useGetDocumentQuery,
+  useGetVersionsQuery,
+  useCreateVersionMutation,
+  useGetChaptersQuery,
+  useGetChapterQuery,
+  useCreateChapterMutation,
+  useUpdateChapterMutation,
+  useUpdateDocumentMutation,
+} = documentsApi

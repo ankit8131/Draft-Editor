@@ -1,10 +1,31 @@
+type DebouncedFn<T extends unknown[]> = {
+  (...args: T): void
+  flush: () => void
+  cancel: () => void
+}
+
 export function debounce<T extends unknown[]>(
   fn: (...args: T) => void,
   ms: number,
-): (...args: T) => void {
+): DebouncedFn<T> {
   let timer: ReturnType<typeof setTimeout>
-  return (...args: T) => {
+  let pending: (() => void) | null = null
+
+  const debounced = (...args: T) => {
     clearTimeout(timer)
-    timer = setTimeout(() => fn(...args), ms)
+    pending = () => fn(...args)
+    timer = setTimeout(() => { pending?.(); pending = null }, ms)
   }
+
+  debounced.flush = () => {
+    clearTimeout(timer)
+    if (pending) { pending(); pending = null }
+  }
+
+  debounced.cancel = () => {
+    clearTimeout(timer)
+    pending = null
+  }
+
+  return debounced
 }

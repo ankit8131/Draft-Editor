@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Draft Editor",
-  description: "Document editor with draft recovery",
+  title: "Ankit Studio",
+  description: "Professional script writing platform for creators.",
 };
 
 export default function RootLayout({

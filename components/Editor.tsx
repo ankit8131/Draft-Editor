@@ -1,8 +1,8 @@
 'use client'
 
-import { memo, useCallback, useEffect, useRef } from 'react'
+import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import { LexicalComposer } from '@lexical/react/LexicalComposer'
-import { PlainTextPlugin } from '@lexical/react/LexicalPlainTextPlugin'
+import { RichTextPlugin } from '@lexical/react/LexicalRichTextPlugin'
 import { ContentEditable } from '@lexical/react/LexicalContentEditable'
 import { HistoryPlugin } from '@lexical/react/LexicalHistoryPlugin'
 import { AutoFocusPlugin } from '@lexical/react/LexicalAutoFocusPlugin'
@@ -14,33 +14,39 @@ import {
   $getSelection,
   $isRangeSelection,
   $setSelection,
+  FORMAT_TEXT_COMMAND,
+  TextFormatType,
 } from 'lexical'
 import type { EditorState } from 'lexical'
 import { db } from '@/lib/dexie'
 import type { CursorData } from '@/lib/dexie'
 import { debounce } from '@/lib/autosave'
 
-// Saves content + cursor to IndexedDB on every content change.
-// Runs inside LexicalComposer to access the editor instance directly.
-function PersistencePlugin({ docId }: { docId: string }) {
+function PersistencePlugin({ chapterId }: { chapterId: string }) {
   const [editor] = useLexicalComposerContext()
-  // Cursor ref is always updated (no re-render); included in each IndexedDB write
   const cursorRef = useRef<CursorData | null>(null)
+  const isReadyRef = useRef(false)
+
+  useEffect(() => {
+    const id = requestAnimationFrame(() => {
+      isReadyRef.current = true
+    })
+    return () => cancelAnimationFrame(id)
+  }, [])
 
   useEffect(() => {
     const saveToIDB = debounce((content: string) => {
-      db.docs.put({
-        id: docId,
+      db.chapters.put({
+        id: chapterId,
         content,
         cursor: cursorRef.current,
         savedAt: Date.now(),
-        syncedAt: null, // mark unsynced — EditorPage updates this after server save
+        syncedAt: null,
       })
     }, 300)
 
     return editor.registerUpdateListener(({ editorState, dirtyElements, dirtyLeaves }) => {
       editorState.read(() => {
-        // Track cursor on every update (content change or cursor move)
         const sel = $getSelection()
         if ($isRangeSelection(sel)) {
           cursorRef.current = {
@@ -52,26 +58,22 @@ function PersistencePlugin({ docId }: { docId: string }) {
             focusType: sel.focus.type as 'text' | 'element',
           }
         }
-        // Only write to IndexedDB when content changed (not on cursor-only moves)
         if (dirtyElements.size > 0 || dirtyLeaves.size > 0) {
+          if (!isReadyRef.current) return
           saveToIDB(JSON.stringify(editorState))
         }
       })
     })
-  }, [editor, docId])
+  }, [editor, chapterId])
 
   return null
 }
 
-// Restores cursor position from IndexedDB after the editor initializes.
-// Node keys are preserved when Lexical deserializes from JSON, so stored
-// anchor/focus keys are valid after restoring content from IndexedDB.
 function RestoreSelectionPlugin({ cursor }: { cursor: CursorData | null }) {
   const [editor] = useLexicalComposerContext()
 
   useEffect(() => {
     if (!cursor) return
-    // Defer past synchronous initialization so the editor state is ready
     const id = setTimeout(() => {
       editor.update(() => {
         try {
@@ -80,33 +82,95 @@ function RestoreSelectionPlugin({ cursor }: { cursor: CursorData | null }) {
           selection.focus.set(cursor.focusKey, cursor.focusOffset, cursor.focusType)
           $setSelection(selection)
         } catch {
-          // Node keys may be stale if content structure changed; best-effort
+          // stale node keys after content change; best-effort restore
         }
       })
     }, 0)
     return () => clearTimeout(id)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []) // intentionally empty — run once on mount only
+  }, [])
 
   return null
 }
 
+type ActiveFormats = { bold: boolean; italic: boolean; underline: boolean }
+
+export function ToolbarPlugin() {
+  const [editor] = useLexicalComposerContext()
+  const [active, setActive] = useState<ActiveFormats>({ bold: false, italic: false, underline: false })
+
+  useEffect(() => {
+    return editor.registerUpdateListener(({ editorState }) => {
+      editorState.read(() => {
+        const sel = $getSelection()
+        if ($isRangeSelection(sel)) {
+          setActive({
+            bold: sel.hasFormat('bold'),
+            italic: sel.hasFormat('italic'),
+            underline: sel.hasFormat('underline'),
+          })
+        }
+      })
+    })
+  }, [editor])
+
+  const btns: { label: string; fmt: TextFormatType; cls: string }[] = [
+    { label: 'B', fmt: 'bold', cls: 'font-bold' },
+    { label: 'I', fmt: 'italic', cls: 'italic' },
+    { label: 'U', fmt: 'underline', cls: 'underline' },
+  ]
+
+  return (
+    <div className="flex items-center gap-0.5 px-8 sm:px-14 py-1.5 border-b border-zinc-100 shrink-0">
+      {btns.map((btn) => (
+        <button
+          key={btn.fmt}
+          onMouseDown={(e) => {
+            e.preventDefault()
+            editor.dispatchCommand(FORMAT_TEXT_COMMAND, btn.fmt)
+          }}
+          className={`w-7 h-7 rounded text-sm transition-colors ${btn.cls} ${
+            active[btn.fmt as keyof ActiveFormats]
+              ? 'bg-zinc-900 text-white'
+              : 'text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100'
+          }`}
+          title={btn.fmt.charAt(0).toUpperCase() + btn.fmt.slice(1)}
+        >
+          {btn.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
 interface EditorProps {
-  docId: string
+  chapterId: string
   initialContent?: string | null
   initialCursor?: CursorData | null
   onContentChange?: (json: string) => void
 }
 
-const theme = {}
+const theme = {
+  text: {
+    bold: 'font-bold',
+    italic: 'italic',
+    underline: 'underline',
+  },
+}
 
 function onError(error: Error) {
   console.error(error)
 }
 
-// memo() — React never re-renders this for parent state changes (save status, online/offline).
-// Lexical owns the DOM for keystrokes; React only re-renders when docId/initial* props change.
-function EditorComponent({ docId, initialContent, initialCursor, onContentChange }: EditorProps) {
+function EditorComponent({ chapterId, initialContent, initialCursor, onContentChange }: EditorProps) {
+  const isReadyRef = useRef(false)
+  useEffect(() => {
+    const id = requestAnimationFrame(() => {
+      isReadyRef.current = true
+    })
+    return () => cancelAnimationFrame(id)
+  }, [])
+
   const initialConfig = {
     namespace: 'DraftEditor',
     theme,
@@ -116,6 +180,7 @@ function EditorComponent({ docId, initialContent, initialCursor, onContentChange
 
   const handleChange = useCallback(
     (editorState: EditorState) => {
+      if (!isReadyRef.current) return
       onContentChange?.(JSON.stringify(editorState))
     },
     [onContentChange],
@@ -123,26 +188,26 @@ function EditorComponent({ docId, initialContent, initialCursor, onContentChange
 
   return (
     <LexicalComposer initialConfig={initialConfig}>
-      <div className="relative min-h-screen">
-        <PlainTextPlugin
+      <ToolbarPlugin />
+      <div className="relative px-8 sm:px-14 pt-10 pb-32 max-w-[680px] mx-auto">
+        <RichTextPlugin
           contentEditable={
             <ContentEditable
-              className="min-h-screen p-8 outline-none text-base leading-relaxed"
+              className="min-h-[60vh] outline-none text-[17px] leading-[1.85] text-zinc-800 caret-zinc-900 font-[var(--font-geist-sans)]"
               aria-label="Document editor"
             />
           }
           placeholder={
-            <div className="absolute top-8 left-8 text-gray-400 pointer-events-none select-none">
-              Start writing...
+            <div className="absolute top-10 left-8 sm:left-14 text-zinc-300 pointer-events-none select-none text-[17px] leading-[1.85]">
+              Start writing…
             </div>
           }
           ErrorBoundary={LexicalErrorBoundary}
         />
         <HistoryPlugin />
         <AutoFocusPlugin />
-        {/* ignoreSelectionChange: server sync only fires on content changes */}
         <OnChangePlugin onChange={handleChange} ignoreSelectionChange />
-        <PersistencePlugin docId={docId} />
+        <PersistencePlugin chapterId={chapterId} />
         <RestoreSelectionPlugin cursor={initialCursor ?? null} />
       </div>
     </LexicalComposer>

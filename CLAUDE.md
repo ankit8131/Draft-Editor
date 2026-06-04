@@ -1,6 +1,6 @@
 @AGENTS.md
 
-# Ankit Studio — Project Rules for Claude
+# Pocket FM Studio — Project Rules for Claude
 
 ## What this app is
 

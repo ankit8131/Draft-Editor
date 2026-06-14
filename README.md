@@ -1,4 +1,4 @@
-# Pocket FM Studio
+# Studio
 
 A distraction-free script writing app. Auto-saves. Works offline. Supports multiple versions and chapters.
 
